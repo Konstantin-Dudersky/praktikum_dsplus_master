@@ -364,3 +364,69 @@ class IterativeImputerPd(BaseEstimator, TransformerMixin):
             index=df.index
         )
         return df
+
+
+def _sort(values: pd.Series, ascending: bool = True) -> pd.Series:
+    print(values.values)
+    return pd.Series(
+        data=sorted(values.values, reverse=not ascending),
+        index=values.index,
+    )
+
+
+class SortInRow(BaseEstimator, TransformerMixin):
+    """Sort values in row."""
+
+    def __init__(
+        self: 'SortInRow',
+        columns: list,
+        ascending: bool = True,
+    ) -> None:
+        self.ascending = ascending
+        self.columns = columns
+
+    def fit(
+        self: 'SortInRow',
+        x: pd.DataFrame,
+        y: pd.DataFrame = None
+    ) -> 'SortInRow':
+        """Fit."""
+        return self
+
+    def _sort(
+        self: 'SortInRow',
+        values: pd.Series,
+    ) -> pd.Series:
+        """Sort values in series."""
+        return pd.Series(
+            data=sorted(values.values, reverse=not self.ascending),
+            index=values.index,
+            name=values.name,
+        )
+
+    def transform(
+        self: 'SortInRow',
+        x: pd.DataFrame,
+        y: pd.DataFrame = None
+    ) -> pd.DataFrame:
+        """Transform."""
+        x[self.columns] = x[self.columns].apply(self._sort, axis=1)
+        return x
+
+
+if __name__ == '__main__':
+    if True:
+        df = pd.DataFrame(
+            {
+                'a': [0, 1, 2, 3],
+                'b': [0, 2, 1, 3],
+                'c': [0, 1, 2, 3],
+                'd': [0, 3, 2, 3],
+            }
+        )
+        print('before:')
+        print(df)
+        sort_in_row = SortInRow(['b', 'c'], ascending=False)
+        df = sort_in_row.transform(df)
+        print('after:')
+        print(df)
