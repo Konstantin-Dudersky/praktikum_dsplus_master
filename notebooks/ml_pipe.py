@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.cluster import KMeans
 from sklearn.experimental import enable_iterative_imputer  # noqa
 from sklearn.impute import IterativeImputer
 from sklearn.impute import SimpleImputer
@@ -366,14 +367,6 @@ class IterativeImputerPd(BaseEstimator, TransformerMixin):
         return df
 
 
-def _sort(values: pd.Series, ascending: bool = True) -> pd.Series:
-    print(values.values)
-    return pd.Series(
-        data=sorted(values.values, reverse=not ascending),
-        index=values.index,
-    )
-
-
 class SortInRow(BaseEstimator, TransformerMixin):
     """Sort values in row."""
 
@@ -414,8 +407,69 @@ class SortInRow(BaseEstimator, TransformerMixin):
         return x
 
 
+class ToNumpyArray(BaseEstimator, TransformerMixin):
+    """Convert dataframe to numpy.
+
+    Some algorithms throw UserWarning, when get DataFrame."""
+
+    def fit(
+        self: 'ToNumpyArray',
+        x: pd.DataFrame,
+        y: pd.DataFrame = None
+    ) -> 'ToNumpyArray':
+        """Fit."""
+        return self
+
+    def transform(
+        self: 'ToNumpyArray',
+        x: pd.DataFrame,
+        y: pd.DataFrame = None
+    ) -> np.ndarray:
+        """Transform."""
+        return x.values
+
+
+class NewFeatureFromCluster(BaseEstimator, TransformerMixin):
+    """Generate new feature with KMeans clustering."""
+
+    def __init__(
+        self: 'NewFeatureFromCluster',
+        new_feature_name: str,
+        based_on: list,
+        n_clusters: int,
+    ) -> None:
+        self.new_feature_name = new_feature_name
+        self.based_on = based_on
+        self.n_clusters = n_clusters
+
+        self.kmeans = KMeans(
+            n_clusters=self.n_clusters,
+        )
+
+    def fit(
+        self: 'NewFeatureFromCluster',
+        x: pd.DataFrame,
+        y: pd.DataFrame = None
+    ) -> 'NewFeatureFromCluster':
+        """Fit."""
+        self.kmeans.fit(x[self.based_on])
+        return self
+
+    def transform(
+        self: 'NewFeatureFromCluster',
+        x: pd.DataFrame,
+        y: pd.DataFrame = None
+    ) -> pd.DataFrame:
+        """Transform."""
+        x[self.new_feature_name] = self.kmeans.predict(x[self.based_on])
+        x[self.new_feature_name] = x[self.new_feature_name].astype('category')
+        return x
+
+
 if __name__ == '__main__':
-    if True:
+    test = 'NewFeatureFromCluster'
+
+    if test == 'SortInRow':
         df = pd.DataFrame(
             {
                 'a': [0, 1, 2, 3],
@@ -430,3 +484,22 @@ if __name__ == '__main__':
         df = sort_in_row.transform(df)
         print('after:')
         print(df)
+
+    if test == 'NewFeatureFromCluster':
+        df = pd.DataFrame(
+            {
+                'a': [0, 1, 2, 3],
+                'b': [0, 2, 9, 8],
+                'c': [0, 1, 10, 9],
+                'd': [0, 3, 2, 3],
+            }
+        )
+        print('before:')
+        print(df)
+        kmeans = NewFeatureFromCluster(
+            new_feature_name='new',
+            based_on=['b', 'c'],
+            n_clusters=2,
+        )
+        print('after:')
+        print(kmeans.fit_transform(df))
