@@ -11,7 +11,9 @@ from sklearn.metrics import (
     mean_absolute_error, mean_absolute_percentage_error, mean_squared_error,
     r2_score
 )
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
+from sklearn.preprocessing import (
+    OneHotEncoder, OrdinalEncoder, PolynomialFeatures, StandardScaler
+)
 from sklearn.utils import Bunch
 
 
@@ -113,7 +115,11 @@ class DisplayDfInPipe(BaseEstimator, TransformerMixin):
 class OneHotEncoderMy(BaseEstimator, TransformerMixin):
     """OneHotEncoder with pandas support."""
 
-    def __init__(self: 'OneHotEncoderMy', columns: list | str) -> None:
+    def __init__(
+        self: 'OneHotEncoderMy',
+        columns: list | str,
+        drop: str = None,
+    ) -> None:
         if type(columns) == list:
             self.columns = columns
         elif type(columns) == str:
@@ -121,10 +127,14 @@ class OneHotEncoderMy(BaseEstimator, TransformerMixin):
         else:
             raise TypeError('Wrong type of parameter "columns"')
 
+        self.drop = drop
         self.encoders = {}
         for col in self.columns:
             self.encoders[col] = OneHotEncoder(
-                sparse=False, dtype=np.uint8, handle_unknown='ignore'
+                sparse=False,
+                dtype=np.uint8,
+                handle_unknown='ignore',
+                drop=self.drop,
             )
 
     def fit(
@@ -466,8 +476,37 @@ class NewFeatureFromCluster(BaseEstimator, TransformerMixin):
         return x
 
 
+class PolynomialFeatures_(BaseEstimator, TransformerMixin):
+
+    def __init__(
+        self: 'PolynomialFeatures_',
+        columns: list,
+    ) -> None:
+        self.columns = columns
+        self.poly = PolynomialFeatures()
+
+    def fit(
+        self: 'PolynomialFeatures_',
+        x: pd.DataFrame,
+        y: pd.DataFrame = None
+    ) -> 'PolynomialFeatures_':
+        """Fit."""
+        self.poly.fit(x[self.columns])
+        return self
+
+    def transform(
+        self: 'PolynomialFeatures_',
+        x: pd.DataFrame,
+        y: pd.DataFrame = None
+    ) -> pd.DataFrame:
+        """Transform."""
+        res = self.poly.transform(x[self.columns])
+        print(res)
+        return x
+
+
 if __name__ == '__main__':
-    test = 'NewFeatureFromCluster'
+    test = 'PolynomialFeatures_'
 
     if test == 'SortInRow':
         df = pd.DataFrame(
@@ -503,3 +542,20 @@ if __name__ == '__main__':
         )
         print('after:')
         print(kmeans.fit_transform(df))
+
+    if test == 'PolynomialFeatures_':
+        df = pd.DataFrame(
+            {
+                'a': [0, 1, 2, 3],
+                'b': [0, 2, 9, 8],
+                'c': [0, 1, 10, 9],
+                'd': [0, 3, 2, 3],
+            }
+        )
+        print('before:')
+        print(df)
+        poly = PolynomialFeatures_(
+            columns=['b', 'c'],
+        )
+        print('after:')
+        print(poly.fit_transform(df))
