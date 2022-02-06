@@ -543,7 +543,7 @@ class PipePolynomialFeatures(BaseEstimator, TransformerMixin):
 
     def __init__(
         self: 'PipePolynomialFeatures',
-        columns: list,
+        columns: list = None,
         degree: int = 2,
         interaction_only: bool = False,
         include_bias: bool = True,
@@ -567,6 +567,8 @@ class PipePolynomialFeatures(BaseEstimator, TransformerMixin):
         y: pd.DataFrame = None,
     ) -> 'PipePolynomialFeatures':
         """Fit."""
+        if self.columns is None:
+            self.columns = x.columns
         self.poly.fit(x[self.columns])
         return self
 
