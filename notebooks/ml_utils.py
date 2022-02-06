@@ -487,7 +487,7 @@ class ToNumpyArray(BaseEstimator, TransformerMixin):
     def fit(
         self: 'ToNumpyArray',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
+        y: pd.DataFrame = None,
     ) -> 'ToNumpyArray':
         """Fit."""
         return self
@@ -495,7 +495,7 @@ class ToNumpyArray(BaseEstimator, TransformerMixin):
     def transform(
         self: 'ToNumpyArray',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
+        y: pd.DataFrame = None,
     ) -> np.ndarray:
         """Transform."""
         return x.values
@@ -521,7 +521,7 @@ class NewFeatureFromCluster(BaseEstimator, TransformerMixin):
     def fit(
         self: 'NewFeatureFromCluster',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
+        y: pd.DataFrame = None,
     ) -> 'NewFeatureFromCluster':
         """Fit."""
         self.kmeans.fit(x[self.based_on])
@@ -530,7 +530,7 @@ class NewFeatureFromCluster(BaseEstimator, TransformerMixin):
     def transform(
         self: 'NewFeatureFromCluster',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
+        y: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Transform."""
         x[self.new_feature_name] = self.kmeans.predict(x[self.based_on])
@@ -539,6 +539,7 @@ class NewFeatureFromCluster(BaseEstimator, TransformerMixin):
 
 
 class PipePolynomialFeatures(BaseEstimator, TransformerMixin):
+    """Generate polynomial and interaction features."""
 
     def __init__(
         self: 'PipePolynomialFeatures',
@@ -547,6 +548,7 @@ class PipePolynomialFeatures(BaseEstimator, TransformerMixin):
         interaction_only: bool = False,
         include_bias: bool = True,
     ) -> None:
+        """Create PolynomialFeatures transformer."""
         self.feature_names_in_ = None
         self.columns = columns
         self.degree = degree

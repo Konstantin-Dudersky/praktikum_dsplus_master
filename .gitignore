@@ -2,3 +2,4 @@
 catboost_info/
 .idea
 cache/
+data/my_submission.csv
