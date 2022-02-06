@@ -112,14 +112,15 @@ class DisplayDfInPipe(BaseEstimator, TransformerMixin):
         return x
 
 
-class OneHotEncoderMy(BaseEstimator, TransformerMixin):
+class PipeOneHotEncoder(BaseEstimator, TransformerMixin):
     """OneHotEncoder with pandas support."""
 
     def __init__(
-        self: 'OneHotEncoderMy',
+        self: 'PipeOneHotEncoder',
         columns: list | str,
         drop: str = None,
     ) -> None:
+        self.feature_names_in_ = None
         if type(columns) == list:
             self.columns = columns
         elif type(columns) == str:
@@ -138,10 +139,10 @@ class OneHotEncoderMy(BaseEstimator, TransformerMixin):
             )
 
     def fit(
-        self: 'OneHotEncoderMy',
+        self: 'PipeOneHotEncoder',
         x: pd.DataFrame,
         y: pd.DataFrame = None,
-    ) -> 'OneHotEncoderMy':
+    ) -> 'PipeOneHotEncoder':
         """Fit."""
         self.columns = [col for col in self.columns if col in x.columns]
         for col in self.columns:
@@ -149,26 +150,37 @@ class OneHotEncoderMy(BaseEstimator, TransformerMixin):
         return self
 
     def transform(
-        self: 'OneHotEncoderMy',
+        self: 'PipeOneHotEncoder',
         x: pd.DataFrame,
         y: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Transform."""
         df = x.copy()
         for col in self.columns:
-            feature_names = [f"{col}{x[2:]}" for x in
-                             self.encoders[col].get_feature_names_out()]
+            feature_names = [
+                f'{col}{x[2:]}' for x in
+                self.encoders[col].get_feature_names_out()
+            ]
 
             x_transformed = self.encoders[col].transform(
-                df[col].to_numpy().reshape(-1, 1)
+                df[col].to_numpy().reshape(-1, 1),
             )
             x_transformed_df = pd.DataFrame(
                 data=x_transformed,
                 columns=feature_names,
-                index=df.index
+                index=df.index,
             )
             df = pd.concat([df, x_transformed_df], axis=1).drop(columns=[col])
+
+        self.feature_names_in_ = df.columns
         return df
+
+    def get_feature_names_out(
+        self: 'PipeOneHotEncoder',
+        input_features: list | str = None,
+    ) -> list:
+        """Get output feature names for transformation."""
+        return self.feature_names_in_
 
 
 class OrdinalEncoderMy(BaseEstimator, TransformerMixin):
@@ -204,59 +216,71 @@ class OrdinalEncoderMy(BaseEstimator, TransformerMixin):
         df[self.columns] = pd.DataFrame(
             data=self.encoder.transform(df[self.columns]),
             columns=df[self.columns].columns,
-            index=df.index
+            index=df.index,
         )
         return df
 
 
-class StandardScalerMy(BaseEstimator, TransformerMixin):
+class PipeStandardScaler(BaseEstimator, TransformerMixin):
     """StandardScaler with pandas support."""
 
     def __init__(
-        self: 'StandardScalerMy',
-        columns: list | str,
-    ):
-        if type(columns) == list:
-            self.columns = columns
-        elif type(columns) == str:
-            self.columns = [columns]
-        else:
-            raise TypeError('Wrong type of parameter "columns"')
+        self: 'PipeStandardScaler',
+        columns: list = None,
+    ) -> None:
+        """Construct PipeStandardScaler.
 
+        :param columns: Columns for scale. If None, scale all columns with
+        float type.
+        """
+        self.feature_names_in_ = None
+        self.columns = columns
         self.scaler = StandardScaler()
 
     def fit(
-        self: 'StandardScalerMy',
+        self: 'PipeStandardScaler',
         x: pd.DataFrame,
         y: pd.DataFrame = None,
-    ) -> 'StandardScalerMy':
+    ) -> 'PipeStandardScaler':
         """Fit."""
-        # remove columns not exist in dataframe
-        self.columns = [col for col in self.columns if col in x.columns]
+        if self.columns is None:
+            self.columns = x.select_dtypes(include=[float]).columns
+        else:
+            # remove columns not exist in dataframe
+            self.columns = [col for col in self.columns if col in x.columns]
         self.scaler.fit(x[self.columns])
         return self
 
     def transform(
-        self: 'StandardScalerMy',
+        self: 'PipeStandardScaler',
         x: pd.DataFrame,
         y: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Transform."""
         df = x.copy()
         df[self.columns] = self.scaler.transform(df[self.columns])
+        self.feature_names_in_ = list(df.columns)
         return df
 
+    def get_feature_names_out(
+        self: 'PipeStandardScaler',
+        input_features: list | str = None,
+    ) -> list:
+        """Get output feature names for transformation."""
+        return self.feature_names_in_
 
-class SimpleImputerMy(BaseEstimator, TransformerMixin):
+
+class PipeSimpleImputer(BaseEstimator, TransformerMixin):
     """SimpleImputer with pandas support."""
 
     def __init__(
-        self: 'SimpleImputerMy',
+        self: 'PipeSimpleImputer',
         columns: list | str,
         strategy: str = 'mean',
         fill_value=None,
-        missing_indicator=False
+        missing_indicator: bool = False,
     ) -> None:
+        self.feature_names_in_ = None
         if type(columns) == list:
             self.columns = columns
         elif type(columns) == str:
@@ -269,34 +293,45 @@ class SimpleImputerMy(BaseEstimator, TransformerMixin):
         self.strategy = strategy
         self.imputer = SimpleImputer(
             missing_values=np.nan, strategy=self.strategy,
-            fill_value=self.fill_value
+            fill_value=self.fill_value,
         )
 
     def fit(
-        self: 'SimpleImputerMy',
+        self: 'PipeSimpleImputer',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
-    ) -> 'SimpleImputerMy':
+        y: pd.DataFrame = None,
+    ) -> 'PipeSimpleImputer':
         """Fit."""
         self.imputer.fit(x[self.columns])
         return self
 
     def transform(
-        self: 'SimpleImputerMy',
+        self: 'PipeSimpleImputer',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
+        y: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Transform."""
         df = x.copy()
 
-        df[self.columns] = self.imputer.transform(df[self.columns])
+        df[self.columns] = pd.DataFrame(
+            data=self.imputer.transform(df[self.columns]),
+            columns=df[self.columns].columns,
+            index=df[self.columns].index,
+        ).astype(df[self.columns].dtypes.to_dict())
 
         # добавляем признак с инфо о пропущенных значениях
         for col in self.columns:
             if self.missing_indicator:
                 df[f'{col}_isna'] = df[col].isna()
-
+        self.feature_names_in_ = df.columns
         return df
+
+    def get_feature_names_out(
+        self: 'PipeSimpleImputer',
+        input_features: list | str = None,
+    ) -> list:
+        """Get output feature names for transformation."""
+        return self.feature_names_in_
 
 
 class OutliersToNAN(BaseEstimator, TransformerMixin):
@@ -308,6 +343,7 @@ class OutliersToNAN(BaseEstimator, TransformerMixin):
         low: float = None,
         high: float = None,
     ) -> None:
+        self.feature_names_in_ = None
         if type(columns) == list:
             self.columns = columns
         elif type(columns) == str:
@@ -321,7 +357,7 @@ class OutliersToNAN(BaseEstimator, TransformerMixin):
     def fit(
         self: 'OutliersToNAN',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
+        y: pd.DataFrame = None,
     ) -> 'OutliersToNAN':
         """Fit."""
         # remove columns not exist in dataframe
@@ -331,7 +367,7 @@ class OutliersToNAN(BaseEstimator, TransformerMixin):
     def transform(
         self: 'OutliersToNAN',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
+        y: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Transform."""
         df = x.copy()
@@ -340,41 +376,58 @@ class OutliersToNAN(BaseEstimator, TransformerMixin):
                 df.loc[(df[col] < self.low), col] = np.NAN
             if self.high is not None:
                 df.loc[(df[col] > self.high), col] = np.NAN
+        self.feature_names_in_ = df.columns
         return df
 
+    def get_feature_names_out(
+        self: 'OutliersToNAN',
+        input_features: list | str = None,
+    ) -> list:
+        """Get output feature names for transformation."""
+        return self.feature_names_in_
 
-class IterativeImputerPd(BaseEstimator, TransformerMixin):
+
+class PipeIterativeImputer(BaseEstimator, TransformerMixin):
     """Iterative imputer."""
 
     def __init__(
-        self: 'IterativeImputerPd',
+        self: 'PipeIterativeImputer',
         columns: list,
     ) -> None:
+        self.feature_names_in_ = None
         self.columns = columns
         self.imputer = IterativeImputer()
 
     def fit(
-        self: 'IterativeImputerPd',
+        self: 'PipeIterativeImputer',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
-    ) -> 'IterativeImputerPd':
+        y: pd.DataFrame = None,
+    ) -> 'PipeIterativeImputer':
         """Fit."""
         self.imputer.fit(x[self.columns])
         return self
 
     def transform(
-        self: 'IterativeImputerPd',
+        self: 'PipeIterativeImputer',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
+        y: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Transform."""
         df = x.copy()
         df[self.columns] = pd.DataFrame(
             data=self.imputer.transform(df[self.columns]),
             columns=df[self.columns].columns,
-            index=df.index
+            index=df.index,
         )
+        self.feature_names_in_ = df.columns
         return df
+
+    def get_feature_names_out(
+        self: 'OutliersToNAN',
+        input_features: list | str = None,
+    ) -> list:
+        """Get output feature names for transformation."""
+        return self.feature_names_in_
 
 
 class SortInRow(BaseEstimator, TransformerMixin):
@@ -385,13 +438,14 @@ class SortInRow(BaseEstimator, TransformerMixin):
         columns: list,
         ascending: bool = True,
     ) -> None:
+        self.feature_names_in_ = None
         self.ascending = ascending
         self.columns = columns
 
     def fit(
         self: 'SortInRow',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
+        y: pd.DataFrame = None,
     ) -> 'SortInRow':
         """Fit."""
         return self
@@ -410,11 +464,19 @@ class SortInRow(BaseEstimator, TransformerMixin):
     def transform(
         self: 'SortInRow',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
+        y: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Transform."""
         x[self.columns] = x[self.columns].apply(self._sort, axis=1)
+        self.feature_names_in_ = x.columns
         return x
+
+    def get_feature_names_out(
+        self: 'SortInRow',
+        input_features: list | str = None,
+    ) -> list:
+        """Get output feature names for transformation."""
+        return self.feature_names_in_
 
 
 class ToNumpyArray(BaseEstimator, TransformerMixin):
@@ -476,33 +538,58 @@ class NewFeatureFromCluster(BaseEstimator, TransformerMixin):
         return x
 
 
-class PolynomialFeatures_(BaseEstimator, TransformerMixin):
+class PipePolynomialFeatures(BaseEstimator, TransformerMixin):
 
     def __init__(
-        self: 'PolynomialFeatures_',
+        self: 'PipePolynomialFeatures',
         columns: list,
+        degree: int = 2,
+        interaction_only: bool = False,
+        include_bias: bool = True,
     ) -> None:
+        self.feature_names_in_ = None
         self.columns = columns
-        self.poly = PolynomialFeatures()
+        self.degree = degree
+        self.interaction_only = interaction_only
+        self.include_bias = include_bias
+
+        self.poly = PolynomialFeatures(
+            degree=self.degree,
+            interaction_only=self.interaction_only,
+            include_bias=self.include_bias,
+        )
 
     def fit(
-        self: 'PolynomialFeatures_',
+        self: 'PipePolynomialFeatures',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
-    ) -> 'PolynomialFeatures_':
+        y: pd.DataFrame = None,
+    ) -> 'PipePolynomialFeatures':
         """Fit."""
         self.poly.fit(x[self.columns])
         return self
 
     def transform(
-        self: 'PolynomialFeatures_',
+        self: 'PipePolynomialFeatures',
         x: pd.DataFrame,
-        y: pd.DataFrame = None
+        y: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Transform."""
-        res = self.poly.transform(x[self.columns])
-        print(res)
-        return x
+        new_cols = pd.DataFrame(
+            data=self.poly.transform(x[self.columns]),
+            index=x.index,
+            columns=self.poly.get_feature_names_out(),
+        )
+        df_drop_old = x.drop(columns=self.columns)
+        df = df_drop_old.join(new_cols)
+        self.feature_names_in_ = df.columns
+        return df
+
+    def get_feature_names_out(
+        self: 'PipePolynomialFeatures',
+        input_features: list | str = None,
+    ) -> list:
+        """Get output feature names for transformation."""
+        return self.feature_names_in_
 
 
 if __name__ == '__main__':
@@ -515,7 +602,7 @@ if __name__ == '__main__':
                 'b': [0, 2, 1, 3],
                 'c': [0, 1, 2, 3],
                 'd': [0, 3, 2, 3],
-            }
+            },
         )
         print('before:')
         print(df)
@@ -554,8 +641,10 @@ if __name__ == '__main__':
         )
         print('before:')
         print(df)
-        poly = PolynomialFeatures_(
+        poly = PipePolynomialFeatures(
             columns=['b', 'c'],
+            degree=2,
+            include_bias=True,
         )
         print('after:')
         print(poly.fit_transform(df))
